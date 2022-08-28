@@ -1,3 +1,5 @@
+const Blogs = require('../models/blog');
+
 const initialBlogs = [
   {
     title: 'ssss blog',
@@ -21,7 +23,11 @@ const initialBlogs = [
     id: '630b891619d780bc5819709f',
   },
 ];
-
+const blogsInDb = async () => {
+  const blogs = await Blogs.find({});
+  return blogs.map((blog) => blog.toJSON());
+};
 module.exports = {
   initialBlogs,
+  blogsInDb,
 };
