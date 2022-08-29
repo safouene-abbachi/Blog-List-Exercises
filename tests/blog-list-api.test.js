@@ -8,10 +8,7 @@ const api = supertest(app);
 
 beforeEach(async () => {
   await Blog.deleteMany({});
-
-  const blogsObject = helper.initialBlogs.map((blog) => new Blog(blog));
-  const promiseArray = blogsObject.map((blog) => blog.save());
-  await Promise.all(promiseArray);
+  await Blog.insertMany(helper.initialBlogs);
 });
 
 describe('When having initial blogs', () => {
@@ -77,6 +74,31 @@ describe('adding new blog', () => {
     await api.post('/api/blogs').send(newBlog).expect(400);
     const blogs = await helper.blogsInDb();
     expect(blogs.length).toBe(helper.initialBlogs.length);
+  }, 100000);
+});
+
+describe('deletion of a blog', () => {
+  test('success of deletion if valid id', async () => {
+    const blogsAtStart = await helper.blogsInDb();
+    const blogToDelete = blogsAtStart[0];
+
+    await api.delete(`/api/blogs/${blogToDelete.id}`).expect(204);
+
+    const blogsAtEnd = await helper.blogsInDb();
+    expect(blogsAtEnd.length).toBe(blogsAtStart.length - 1);
+
+    const titles = blogsAtEnd.map((blog) => blog.tile);
+    expect(titles).not.toContain(blogToDelete.title);
+  }, 100000);
+});
+
+describe('updating a blog post', () => {
+  test('successfully updating a blog post', async () => {
+    const blogsAtStart = await helper.blogsInDb();
+    const blogToUpdate = blogsAtStart[0];
+    await api.put(`/api/blogs/${blogToUpdate.id}`).expect(200);
+    const blogsAtEnd = await helper.blogsInDb();
+    expect(blogsAtStart.length).toBe(blogsAtEnd.length);
   }, 100000);
 });
 
