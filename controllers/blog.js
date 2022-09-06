@@ -1,41 +1,60 @@
 const blogsRouter = require('express').Router();
 const Blog = require('../models/blog');
-const User = require('../models/user');
-const jwt = require('jsonwebtoken');
-blogsRouter.get('/', async (request, response) => {
-  const blogs = await Blog.find({}).populate('user', { username: 1, name: 1 });
-  response.json(blogs);
+const { userExtractor } = require('../utils/middlware');
+
+blogsRouter.get('/', async (request, response, next) => {
+  try {
+    const blogs = await Blog.find({}).populate('user', {
+      username: 1,
+      name: 1,
+    });
+    response.json(blogs);
+  } catch (error) {
+    next(error);
+  }
 });
 
-blogsRouter.post('/', async (request, response) => {
-  console.log('🚀 ~ token', request.token);
-  const decodedToken = jwt.verify(request.token, process.env.SECRET);
-  if (!decodedToken.id) {
-    return res.status(401).json({ error: 'token missing or invalid' });
-  }
-  const user = await User.findById(decodedToken.id);
+blogsRouter.post('/', userExtractor, async (request, response, next) => {
+  try {
+    const user = request.user;
 
-  const blog = new Blog({ ...request.body, user: user._id });
-  if (!blog.likes) {
-    blog.likes = 0;
+    const blog = new Blog({ ...request.body, user: user._id });
+    if (!blog.likes) {
+      blog.likes = 0;
+    }
+    if (!blog.title || !blog.url) {
+      return response.status(400).json('missing property');
+    }
+    const newlyAdded = await blog.save();
+    user.blogs = user.blogs.concat(blog._id);
+    user.save();
+    return response.status(201).json(newlyAdded);
+  } catch (error) {
+    next(error);
   }
-  if (!blog.title || !blog.url) {
-    return response.status(400).json('missing property');
-  }
-  const newlyAdded = await blog.save();
-  user.blogs = user.blogs.concat(blog._id);
-  user.save();
-  return response.status(201).json(newlyAdded);
 });
 
-blogsRouter.delete('/:id', async (req, res) => {
-  const id = req.params.id;
-  const result = await Blog.findByIdAndRemove(id);
+blogsRouter.delete('/:id', userExtractor, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
 
-  if (result) {
-    return res.status(204).end();
-  } else {
-    return res.status(404).end();
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(401).json({ error: 'blog does not exist' });
+    }
+
+    if (blog.user.toString() === user._id.toString()) {
+      await Blog.findByIdAndRemove(id);
+
+      return res.status(204).json('blog successfully removed');
+    } else {
+      return res
+        .status(401)
+        .json({ error: 'you are not authorized to delete this blog' });
+    }
+  } catch (error) {
+    next(error);
   }
 });
 blogsRouter.put('/:id', async (req, res) => {

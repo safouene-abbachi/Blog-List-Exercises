@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 const supertest = require('supertest');
+const bcrypt = require('bcryptjs');
 const helper = require('./test_helper');
 const app = require('../app');
 const Blog = require('../models/blog');
 //supertest is a superagent object an dit's used for making tests for the HTTP requests
 const api = supertest(app);
-
+jest.setTimeout(10000);
 beforeEach(async () => {
   await Blog.deleteMany({});
   await Blog.insertMany(helper.initialBlogs);
@@ -22,16 +23,33 @@ describe('When having initial blogs', () => {
   test('number of blogs returned as json', async () => {
     const response = await api.get('/api/blogs');
     expect(response.body).toHaveLength(helper.initialBlogs.length);
-  }, 100000);
+  });
 
   test('blogs must have id property', async () => {
     const response = await api.get('/api/blogs');
 
     expect(response.body[0]['id']).toBeDefined;
-  }, 100000);
+  });
 });
 
 describe('adding new blog', () => {
+  let token;
+  beforeAll(async () => {
+    await User.deleteMany({});
+    const passwordHash = await bcrypt.hash('password', 10);
+    const user = new User({
+      username: 'safouene',
+      passwordHash,
+    });
+    await user.save();
+    //login user for token
+    const result = await api
+      .post('/api/login')
+      .send({ username: 'safouene', password: 'password' });
+    token = result.body.token;
+    return token;
+  });
+
   test('successfull creation of a blog', async () => {
     const newBlog = {
       title: 'ameni blog',
@@ -41,6 +59,7 @@ describe('adding new blog', () => {
     };
     await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-type', /application\/json/);
@@ -48,7 +67,7 @@ describe('adding new blog', () => {
     expect(blogsAtEnd).toHaveLength(helper.initialBlogs.length + 1);
     const titles = blogsAtEnd.map((blog) => blog.title);
     expect(titles).toContain('ameni blog');
-  }, 100000);
+  });
   test('missing like property', async () => {
     const newBlog = {
       title: 'ameni blog',
@@ -64,7 +83,7 @@ describe('adding new blog', () => {
 
     const blogs = await helper.blogsInDb();
     expect(blogs[blogs.length - 1].likes).toBe(0);
-  }, 100000);
+  });
 
   test('missing title or url', async () => {
     const newBlog = {
@@ -74,7 +93,7 @@ describe('adding new blog', () => {
     await api.post('/api/blogs').send(newBlog).expect(400);
     const blogs = await helper.blogsInDb();
     expect(blogs.length).toBe(helper.initialBlogs.length);
-  }, 100000);
+  });
 });
 
 describe('deletion of a blog', () => {
@@ -89,7 +108,7 @@ describe('deletion of a blog', () => {
 
     const titles = blogsAtEnd.map((blog) => blog.tile);
     expect(titles).not.toContain(blogToDelete.title);
-  }, 100000);
+  });
 });
 
 describe('updating a blog post', () => {
@@ -99,7 +118,7 @@ describe('updating a blog post', () => {
     await api.put(`/api/blogs/${blogToUpdate.id}`).expect(200);
     const blogsAtEnd = await helper.blogsInDb();
     expect(blogsAtStart.length).toBe(blogsAtEnd.length);
-  }, 100000);
+  });
 });
 
 afterAll(() => {
