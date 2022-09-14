@@ -21,6 +21,7 @@ const errorHandler = (error, req, res, next) => {
   } else if (error.name === 'ValidationError') {
     return res.status(400).json({ error: error.message });
   } else if (error.name === 'JsonWebTokenError') {
+    console.log('=============================================>', error);
     return res.status(401).json({ error: 'invalid token' });
   }
 
@@ -39,9 +40,8 @@ const tokenExtractor = (request, response, next) => {
 };
 
 const userExtractor = async (req, res, next) => {
-  console.log(req.token);
   const decodedToken = jwt.verify(req.token, process.env.SECRET);
-  console.log('🚀 ~ decodedToken', decodedToken);
+
   const user = await User.findById(decodedToken.id);
 
   if (user) {

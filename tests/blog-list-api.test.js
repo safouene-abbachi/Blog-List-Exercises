@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const helper = require('./test_helper');
 const app = require('../app');
 const Blog = require('../models/blog');
+const User = require('../models/user');
 //supertest is a superagent object an dit's used for making tests for the HTTP requests
 const api = supertest(app);
 jest.setTimeout(10000);
@@ -34,7 +35,7 @@ describe('When having initial blogs', () => {
 
 describe('adding new blog', () => {
   let token;
-  beforeAll(async () => {
+  beforeEach(async () => {
     await User.deleteMany({});
     const passwordHash = await bcrypt.hash('password', 10);
     const user = new User({
@@ -77,6 +78,7 @@ describe('adding new blog', () => {
 
     await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-type', /application\/json/);
@@ -90,24 +92,76 @@ describe('adding new blog', () => {
       author: 'ameni',
       likes: 4,
     };
-    await api.post('/api/blogs').send(newBlog).expect(400);
+    await api
+      .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .send(newBlog)
+      .expect(400);
     const blogs = await helper.blogsInDb();
     expect(blogs.length).toBe(helper.initialBlogs.length);
   });
 });
 
 describe('deletion of a blog', () => {
+  let token = null;
+  beforeEach(async () => {
+    await Blog.deleteMany({});
+    await User.deleteMany({});
+    const passwordHash = await bcrypt.hash('password', 10);
+    const user = new User({
+      username: 'safouene',
+      passwordHash,
+    });
+    await user.save();
+    //login user for token
+    const result = await api
+      .post('/api/login')
+      .send({ username: 'safouene', password: 'password' });
+    token = result.body.token;
+    const newBlog = {
+      title: 'new blog',
+      author: 'saf Doe',
+      url: 'http://dummyurl.com',
+      likes: 62,
+    };
+
+    await api
+      .post('/api/blogs')
+      .send(newBlog)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201)
+      .expect('Content-Type', /application\/json/);
+
+    return token;
+  });
   test('success of deletion if valid id', async () => {
-    const blogsAtStart = await helper.blogsInDb();
+    const blogsAtStart = await Blog.find({}).populate('user');
     const blogToDelete = blogsAtStart[0];
 
-    await api.delete(`/api/blogs/${blogToDelete.id}`).expect(204);
+    await api
+      .delete(`/api/blogs/${blogToDelete._id.toString()}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
 
-    const blogsAtEnd = await helper.blogsInDb();
+    const blogsAtEnd = await Blog.find({}).populate('user');
     expect(blogsAtEnd.length).toBe(blogsAtStart.length - 1);
 
     const titles = blogsAtEnd.map((blog) => blog.tile);
     expect(titles).not.toContain(blogToDelete.title);
+  });
+  test('proper status code 401 Unauthorized if a token is not provided', async () => {
+    let token = null;
+    const blogsAtStart = await Blog.find({}).populate('user');
+    const blogToDelete = blogsAtStart[0];
+
+    await api
+      .delete(`/api/blogs/${blogToDelete._id.toString()}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(401);
+
+    const blogsAtEnd = await Blog.find({}).populate('user');
+    expect(blogsAtEnd).toHaveLength(blogsAtStart.length);
+    expect(blogsAtStart).toEqual(blogsAtEnd);
   });
 });
 

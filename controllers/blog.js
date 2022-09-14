@@ -35,27 +35,23 @@ blogsRouter.post('/', userExtractor, async (request, response, next) => {
 });
 
 blogsRouter.delete('/:id', userExtractor, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const user = req.user;
+  const { id } = req.params;
+  const user = req.user;
 
-    const blog = await Blog.findById(id);
-    if (!blog) {
-      return res.status(401).json({ error: 'blog does not exist' });
-    }
+  const blog = await Blog.findById(id);
 
-    if (blog.user.toString() === user._id.toString()) {
-      await Blog.findByIdAndRemove(id);
-
-      return res.status(204).json('blog successfully removed');
-    } else {
-      return res
-        .status(401)
-        .json({ error: 'you are not authorized to delete this blog' });
-    }
-  } catch (error) {
-    next(error);
+  if (!blog) {
+    return res.status(401).json({ error: 'blog does not exist' });
   }
+
+  if (blog.user.toString() !== user._id.toString()) {
+    return res
+      .status(401)
+      .json({ error: 'You are not authorized to delete this blog' });
+  }
+  await Blog.findByIdAndRemove(id);
+
+  return res.status(204).end;
 });
 blogsRouter.put('/:id', async (req, res) => {
   const id = req.params.id;

@@ -49,7 +49,7 @@ describe('when there is initially one user in db', () => {
       .expect('Content-Type', /application\/json/);
     expect(result.body.error).toContain('username must be unique');
     const usersAtEnd = await helper.usersInDb();
-    expect(usersAtEnd).toEqual(usersAtStart);
+    expect(usersAtEnd.length).toEqual(usersAtStart.length);
   });
   test('creation fails with proper statuscode and message if username is already taken', async () => {
     const usersAtStart = await helper.usersInDb();
