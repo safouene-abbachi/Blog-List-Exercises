@@ -8,6 +8,7 @@ const { MONGODB_URI } = require('./utils/config');
 const blogsRouter = require('./controllers/blog.js');
 const userRouter = require('./controllers/user.js');
 const loginRouter = require('./controllers/login.js');
+const commentRouter = require('./controllers/comments.js');
 
 mongoose
   .connect(MONGODB_URI, {
@@ -28,6 +29,7 @@ app.use(middleware.requestLogger);
 app.use('/api/blogs', blogsRouter);
 app.use('/api/users', userRouter);
 app.use('/api/login', loginRouter);
+app.use('/api/blogs', commentRouter);
 if (process.env.NODE_ENV === 'test') {
   const testingRouter = require('./controllers/testing');
   app.use('/api/testing', testingRouter);
